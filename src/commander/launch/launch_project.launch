@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+
+<launch>
+  <include file="$(find summit_xl_sim_bringup)/launch/summit_xls_complete.launch"/>
+  <!-- <node pkg="commander" type="test.py" name="test" required="true" output="screen"/> -->
+</launch>
