@@ -13,10 +13,7 @@ sudo apt-get install ros-noetic-teleop-twist-keyboard -y
 ```
 ## Initialize the project 
 ```bash
-mkdir CMPRoboMapper
 cd CMPRoboMapper
-git clone https://github.com/Muhammad-saad-2000/CMPRoboMapper.git
-
 #____________
 catkin_make
 #try this if it does not continue (pip install pyparsing==2.4.7) and then catkin_make
