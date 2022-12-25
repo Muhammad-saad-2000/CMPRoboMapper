@@ -2,5 +2,6 @@
 
 <launch>
   <include file="$(find summit_xl_sim_bringup)/launch/summit_xls_complete.launch"/>
+  <!-- <node pkg="commander" type="sensor_alignment.py" name="sensor_alignment" required="true" output="screen"/> -->
   <!-- <node pkg="commander" type="test.py" name="test" required="true" output="screen"/> -->
 </launch>

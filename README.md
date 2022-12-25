@@ -14,21 +14,25 @@ sudo apt-get install ros-noetic-teleop-twist-keyboard -y
 ## Initialize the project 
 ```bash
 cd CMPRoboMapper
+
 #____________
 catkin_make
-#try this if it does not continue (pip install pyparsing==2.4.7) and then catkin_make
+#try this if it does not continue (pip install pyparsing==2.4.7) and then (catkin_make)
 #____________
 
-echo "source ~/catkin_ws/devel/setup.bash" >> ~/.bashrc 
+echo "source ./devel/setup.bash" >> ~/.bashrc 
 source ~/.bashrc
 
-chmod +x "src/commander/scripts"
+chmod +x "src/commander/scripts/keyboard_controller.py"
+chmod +x "src/commander/scripts/sensor_alignment.py"
 ```
 ## Launch the project
 ```bash
+#if using theconstruct sim run this (source ~/CMPRoboMapper/devel/setup.bash)
 roslaunch commander launch_project.launch
 ```
 ## Launch the keyboard controller node
 ```bash
+#if using theconstruct sim run this (source ~/CMPRoboMapper/devel/setup.bash)
 rosrun commander keyboard_controller.py
 ```
