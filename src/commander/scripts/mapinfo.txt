@@ -1,0 +1,23 @@
+header: 
+  seq: 0
+  stamp: 
+    secs: 0
+    nsecs:   1000000
+  frame_id: "robot_map"
+info: 
+  map_load_time: 
+    secs: 0
+    nsecs:   1000000
+  resolution: 0.019999999552965164
+  width: 4992
+  height: 4992
+  origin: 
+    position: 
+      x: -50.0
+      y: -50.0
+      z: 0.0
+    orientation: 
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      w: 1.0

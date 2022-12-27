@@ -7,125 +7,122 @@ from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Header
 
 class SensorData(Header):
-    laser_scan = LaserScan()
-    odometry = Odometry()
+  laser_scan = LaserScan()
+  odometry = Odometry()
 
-current_header_time = 0
-delta_time_threshold = 10000000
-is_front_data = False
-is_rear_data = False
-is_odometry_data = False
-total_laser_data = np.zeros(720, dtype=float)
-total_odometry_data = Odometry()
+current_time_sequance = 0
+DELTA_TIME_MAX = 10000000
+front_data_in_sequance = False
+rear_data_in_sequance = False
+odometry_data_in_sequance = False
+incorporated_laser_data = np.zeros(720, dtype=float)
+odometry_data = Odometry()
 
 
 def read_front_laser(data):
-  global is_front_data
+  global front_data_in_sequance
   global is_total_laser_data
   front_data = data.ranges
-  total_laser_data[0:270] += front_data[270:540]
-  total_laser_data[450:720] += front_data[0:270]
-  is_front_data = True
+  incorporated_laser_data[0:270] += front_data[270:540]
+  incorporated_laser_data[450:720] += front_data[0:270]
+  front_data_in_sequance = True
 
 
 def read_rear_laser(data):
-  global is_rear_data
+  global rear_data_in_sequance
   global is_total_laser_data
   rear_data = data.ranges
-  total_laser_data[90:630] += rear_data[0:540]
-  is_rear_data = True
+  incorporated_laser_data[90:630] += rear_data[0:540]
+  rear_data_in_sequance = True
 
 
 def read_odometry(data):
-  global is_odometry_data
-  global total_odometry_data
-  total_odometry_data = data
-  is_odometry_data = True
+  global odometry_data_in_sequance
+  global odometry_data
+  odometry_data = data
+  odometry_data_in_sequance = True
 
 
 def reset_buffers():
-  global is_front_data
-  global is_rear_data
-  global is_odometry_data
-  global total_laser_data
-  is_rear_data = False
-  is_front_data = False
-  is_odometry_data = False
-  total_laser_data = np.zeros(720, dtype=float)
+  global front_data_in_sequance
+  global rear_data_in_sequance
+  global odometry_data_in_sequance
+  global incorporated_laser_data
+  rear_data_in_sequance = False
+  front_data_in_sequance = False
+  odometry_data_in_sequance = False
+  incorporated_laser_data = np.zeros(720, dtype=float)
 
 
 def all_data_received():
-  global is_front_data
-  global is_rear_data
-  global total_laser_data
-  global total_odometry_data
-  is_rear_data = False
-  is_front_data = False
+  global front_data_in_sequance
+  global rear_data_in_sequance
+  global incorporated_laser_data
+  global odometry_data
+  rear_data_in_sequance = False
+  front_data_in_sequance = False
   # Average the data when both lasers intersects
-  total_laser_data[90:270]/=2
-  total_laser_data[450:720]/=2
+  incorporated_laser_data[90:270]/=2
+  incorporated_laser_data[450:720]/=2
   total_sensor_data = SensorData()
   
-  total_sensor_data.laser_scan.ranges = total_laser_data
-  total_sensor_data.odometry = total_odometry_data
+  total_sensor_data.laser_scan.ranges = incorporated_laser_data
+  total_sensor_data.odometry = odometry_data
   
-  total_sensor_data.seq = total_odometry_data.header.seq
-  total_sensor_data.stamp = total_odometry_data.header.stamp
+  total_sensor_data.seq = odometry_data.header.seq
+  total_sensor_data.stamp = odometry_data.header.stamp
   
   pubObj.publish(total_sensor_data)
 
 
 def callback_front(data):
-  print("Front laser data received with header time: ", (data.header.stamp))
-  global current_header_time
-  global is_front_data
-  global is_rear_data
-  global total_laser_data
-  # Correct header seq
-  if abs(current_header_time - data.header.stamp.to_nsec()) < delta_time_threshold :
+  global current_time_sequance
+  global front_data_in_sequance
+  global rear_data_in_sequance
+  global incorporated_laser_data
+  # Correct time slot
+  if abs(current_time_sequance - data.header.stamp.to_nsec()) < DELTA_TIME_MAX :
     read_front_laser(data)
-    if is_rear_data and is_odometry_data:
+    if rear_data_in_sequance and odometry_data_in_sequance:
       all_data_received()
       reset_buffers()
-  # New header seq
-  elif current_header_time < data.header.stamp.to_nsec():
-    current_header_time = data.header.stamp.to_nsec()
+  # New time slot
+  elif current_time_sequance < data.header.stamp.to_nsec():
+    current_time_sequance = data.header.stamp.to_nsec()
     reset_buffers()
     read_front_laser(data)
 
 def callback_rear(data):
-  print("Rear laser data received with header time: ", (data.header.stamp))
-  global current_header_time
-  global is_front_data
-  global is_rear_data
-  global total_laser_data
-  # Correct header seq
-  if abs(current_header_time-data.header.stamp.to_nsec()) < delta_time_threshold :
+  global current_time_sequance
+  global front_data_in_sequance
+  global rear_data_in_sequance
+  global incorporated_laser_data
+  # Correct time slot
+  if abs(current_time_sequance-data.header.stamp.to_nsec()) < DELTA_TIME_MAX :
     read_rear_laser(data)
-    if is_front_data and is_odometry_data:
+    if front_data_in_sequance and odometry_data_in_sequance:
       all_data_received()
       reset_buffers()
-  # New header seq
-  elif current_header_time < data.header.stamp.to_nsec():
-    current_header_time = data.header.stamp.to_nsec()
+  # New time slot
+  elif current_time_sequance < data.header.stamp.to_nsec():
+    current_time_sequance = data.header.stamp.to_nsec()
     reset_buffers()
     read_rear_laser(data)
 
 def callback_odom(data):
-  print("Odometry data received with header time: ", (data.header.stamp))
-  global current_header_time
-  global is_front_data
-  global is_rear_data
-  global total_laser_data
-  # Correct header seq
-  if abs(current_header_time-data.header.stamp.to_nsec()) < delta_time_threshold :
+  global current_time_sequance
+  global front_data_in_sequance
+  global rear_data_in_sequance
+  global incorporated_laser_data
+  # Correct time slot
+  if abs(current_time_sequance-data.header.stamp.to_nsec()) < DELTA_TIME_MAX :
     read_odometry(data)
-    if is_front_data and is_rear_data:
+    if front_data_in_sequance and rear_data_in_sequance:
       all_data_received()
       reset_buffers()
-  # New header seq
-  elif current_header_time < data.header.stamp.to_nsec():
-    current_header_time = data.header.stamp.to_nsec()
+  # New time slot
+  elif current_time_sequance < data.header.stamp.to_nsec():
+    current_time_sequance = data.header.stamp.to_nsec()
     reset_buffers()
     read_odometry(data)
 

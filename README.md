@@ -34,5 +34,7 @@ roslaunch commander launch_project.launch
 ## Launch the keyboard controller node
 ```bash
 #if using theconstruct sim run this (source ~/CMPRoboMapper/devel/setup.bash)
+rosrun teleop_twist_keyboard teleop_twist_keyboard.py
+# or
 rosrun commander keyboard_controller.py
 ```
