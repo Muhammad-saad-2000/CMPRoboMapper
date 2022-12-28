@@ -4,11 +4,7 @@ import rospy
 import numpy as np
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
-from std_msgs.msg import Header
-
-class SensorData(Header):
-  laser_scan = LaserScan()
-  odometry = Odometry()
+from cmp_msgs.msg import SensorData
 
 current_time_sequance = 0
 DELTA_TIME_MAX = 10000000
@@ -66,14 +62,15 @@ def all_data_received():
   incorporated_laser_data[450:720]/=2
   total_sensor_data = SensorData()
   
-  total_sensor_data.laser_scan.ranges = incorporated_laser_data
+  total_sensor_data.laser_scan.ranges = incorporated_laser_data.tolist()
   total_sensor_data.laser_scan.angle_min = 0
   total_sensor_data.laser_scan.angle_max = 6.274446
+  total_sensor_data.laser_scan.angle_increment=0.008726646
+  #TODO: Check if this is correct
+  total_sensor_data.laser_scan.range_min = 0.1
+  total_sensor_data.laser_scan.range_max = 10.0
   total_sensor_data.odometry = odometry_data
-  
-  total_sensor_data.seq = odometry_data.header.seq
-  total_sensor_data.stamp = odometry_data.header.stamp
-  
+
   pubObj.publish(total_sensor_data)
 
 
@@ -138,3 +135,4 @@ if __name__ == '__main__':
   subObj_front = rospy.Subscriber("/robot/front_laser/scan", LaserScan, callback_front)
   subObj_rear = rospy.Subscriber("/robot/rear_laser/scan", LaserScan, callback_rear)
   rospy.spin()
+  
