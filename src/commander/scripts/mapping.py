@@ -83,11 +83,17 @@ def sensor_data_callback(data):
   orientation = odometry.pose.pose.orientation
   theta = np.arctan2(2 * (orientation.w * orientation.z), 1 - 2 * (orientation.z * orientation.z))
   print(x, y, theta)
-  i, j = location_to_grid(x, y)
+  i, j = location_to_grid(y, x)
 
   for angle, distance in zip(np.arange(len(laser_scan.ranges)) * laser_scan.angle_increment, laser_scan.ranges):
     if distance < laser_scan.range_max:
-      points = free_grid_cells(i, j, theta + angle + 135/180*PI, distance)
+      if angle > PI and angle < 3/2 * PI:
+        j+=int(50*0.2)
+        i-=int(50*0.2)
+      else:
+        j-=int(50*0.2)
+        i+=int(50*0.2)
+      points = free_grid_cells(i, j, -theta + angle + 135/180*PI, distance)
       if len(points) > OCCUPAIED_AT_END:
         for point in points[:-OCCUPAIED_AT_END]:
           log_occupancy_grid[point] += UNOCCUPAIED_LOG_ODD

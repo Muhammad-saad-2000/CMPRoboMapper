@@ -19,8 +19,10 @@ def read_front_laser(data):
   global front_data_in_sequance
   global is_total_laser_data
   front_data = data.ranges
-  incorporated_laser_data[0:270] += front_data[270:540]
-  incorporated_laser_data[450:720] += front_data[0:270]
+  incorporated_laser_data[0:180] = front_data[270:450]
+  incorporated_laser_data[540:720] = front_data[90:270]
+  # METHOD2: incorporated_laser_data[0:270] += front_data[270:540]
+  # METHOD2: incorporated_laser_data[450:720] += front_data[0:270]
   front_data_in_sequance = True
 
 
@@ -28,7 +30,8 @@ def read_rear_laser(data):
   global rear_data_in_sequance
   global is_total_laser_data
   rear_data = data.ranges
-  incorporated_laser_data[90:630] += rear_data[0:540]
+  incorporated_laser_data[180:540] = rear_data[90:450]
+  # METHOD2: incorporated_laser_data[90:630] += rear_data[0:540]
   rear_data_in_sequance = True
 
 
@@ -58,8 +61,8 @@ def all_data_received():
   rear_data_in_sequance = False
   front_data_in_sequance = False
   # Average the data when both lasers intersects
-  incorporated_laser_data[90:270]/=2
-  incorporated_laser_data[450:630]/=2
+  # METHOD2: incorporated_laser_data[90:270]/=2
+  # METHOD2: incorporated_laser_data[450:630]/=2
   total_sensor_data = SensorData()
   
   total_sensor_data.laser_scan.ranges = incorporated_laser_data.tolist()
