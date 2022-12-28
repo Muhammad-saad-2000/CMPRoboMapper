@@ -54,33 +54,48 @@ def free_grid_cells(i, j, angle, distance):
       y0 = y0 + sy
   return points
 
+def publish_occupancy_grid(occupancy_grid):
+  occupancy_grid_msg = OccupancyGrid()
+  occupancy_grid_msg.header.stamp = rospy.Time.now()
+  occupancy_grid_msg.header.frame_id = "robot_map"
+  occupancy_grid_msg.info.resolution = RESOLUTION
+  occupancy_grid_msg.info.width = MAP_SIZE_WIDTH
+  occupancy_grid_msg.info.height = MAP_SIZE_HEIGHT
+  occupancy_grid_msg.info.origin.position.x = -X_OFFSET
+  occupancy_grid_msg.info.origin.position.y = -Y_OFFSET
+  occupancy_grid_msg.info.origin.position.z = 0
+  occupancy_grid_msg.info.origin.orientation.x = 0
+  occupancy_grid_msg.info.origin.orientation.y = 0
+  occupancy_grid_msg.info.origin.orientation.z = 0
+  occupancy_grid_msg.info.origin.orientation.w = 1
+  occupancy_grid_msg.data = occupancy_grid.flatten().tolist()
+  occupancy_grid_publisher.publish(occupancy_grid_msg)
+
+def sensor_data_callback(sensor_data):
+  odometry = sensor_data.odometry
+  laser_scan = sensor_data.laser_scan
+
+  x, y, theta = odometry.pose.pose.position.x, odometry.pose.pose.position.y, odometry.pose.pose.orientation.z
+  i, j = location_to_grid(x, y)
+
+  for angle, distance in zip(np.arange(len(laser_scan.ranges)) * laser_scan.angle_increment, laser_scan.ranges):
+    if distance < laser_scan.range_max:
+      for i_itr, j_itr in free_grid_cells(i, j, theta + angle, distance):
+        if i_itr >= 0 and i_itr < MAP_SIZE_WIDTH and j_itr >= 0 and j_itr < MAP_SIZE_HEIGHT:
+          occupancy_grid[i_itr, j_itr] += (1 - occupancy_grid[i_itr, j_itr]) * 0.1
+  
+  publish_occupancy_grid(occupancy_grid)
+
+
+
 if __name__ == '__main__':
   rospy.init_node('mapping')
   rospy.loginfo('mapping node started')
   occupancy_grid = np.zeros((MAP_SIZE_WIDTH, MAP_SIZE_HEIGHT))
-  scale = 0.01
-
-  for i in range(MAP_SIZE_WIDTH):
-    for j in range(MAP_SIZE_HEIGHT):
-      noise_value = pnoise2(i * scale, j * scale)
-      occupancy_grid[i, j] = noise_value * 255
-
-  # Create a publisher for the occupancy grid
+  
   occupancy_grid_publisher = rospy.Publisher('/occupancy_grid', OccupancyGrid)
   rate = rospy.Rate(10)
-  while not rospy.is_shutdown():
-    occupancy_grid_msg = OccupancyGrid()
-    occupancy_grid_msg.header.stamp = rospy.Time.now()
-    occupancy_grid_msg.info.resolution = RESOLUTION
-    occupancy_grid_msg.info.width = MAP_SIZE_WIDTH
-    occupancy_grid_msg.info.height = MAP_SIZE_HEIGHT
-    occupancy_grid_msg.info.origin.position.x = -X_OFFSET
-    occupancy_grid_msg.info.origin.position.y = -Y_OFFSET
-    occupancy_grid_msg.info.origin.position.z = 0
-    occupancy_grid_msg.info.origin.orientation.x = 0
-    occupancy_grid_msg.info.origin.orientation.y = 0
-    occupancy_grid_msg.info.origin.orientation.z = 0
-    occupancy_grid_msg.info.origin.orientation.w = 1
-    occupancy_grid_msg.data = occupancy_grid.flatten().tolist()
-    occupancy_grid_publisher.publish(occupancy_grid_msg)
-    rate.sleep()
+  
+  sensor_data = SensorData()
+  sensor_data_subscriber = rospy.Subscriber('/aligned_sensors', SensorData, sensor_data_callback)
+  rospy.spin()
