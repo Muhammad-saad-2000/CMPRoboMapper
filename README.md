@@ -25,11 +25,15 @@ source ~/.bashrc
 
 chmod +x "src/commander/scripts/keyboard_controller.py"
 chmod +x "src/commander/scripts/sensor_alignment.py"
+chmod +x "src/commander/scripts/mapping.py"
 ```
 ## Launch the project
 ```bash
 #if using theconstruct sim run this (source ~/CMPRoboMapper/devel/setup.bash)
+# for baic simulation
 roslaunch commander launch_project.launch
+# for mapping simulation
+roslaunch commander launch_mapping.launch
 ```
 ## Launch the keyboard controller node
 ```bash
@@ -38,3 +42,4 @@ rosrun teleop_twist_keyboard teleop_twist_keyboard.py /cmd_vel:=/robot/robotnik_
 # or
 rosrun commander keyboard_controller.py
 ```
+
