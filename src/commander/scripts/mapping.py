@@ -11,10 +11,14 @@ from cmp_msgs.msg import SensorData
 PI = 3.14159265358979323846
 X_OFFSET = 50
 Y_OFFSET = 50
-RESOLUTION = 0.02 # 0.02
+RESOLUTION = 0.02
 MAP_SIZE_WIDTH = 4992
 MAP_SIZE_HEIGHT = 4992
-occupancy_grid = np.zeros((MAP_SIZE_WIDTH, MAP_SIZE_HEIGHT))
+OCCUPAIED_AT_END = 10
+OCCUPAIED_LOG_ODD= 1.386
+UNOCCUPAIED_LOG_ODD = -1.386
+
+log_occupancy_grid = np.zeros((MAP_SIZE_WIDTH, MAP_SIZE_HEIGHT))
 
 #NOTE: x,y are the actual coordinates not the indexes of the occupancy grid
 #NOTE: i,j are indexes of the occupancy grid not the actual coordinates
@@ -64,7 +68,7 @@ def publish_occupancy_grid(occupancy_grid):
   occupancy_grid_msg.info.origin.orientation.y = 0
   occupancy_grid_msg.info.origin.orientation.z = 0
   occupancy_grid_msg.info.origin.orientation.w = 1
-  
+  occupancy_grid = occupancy_grid * 120
   occupancy_grid = occupancy_grid.astype(int)
   occupancy_grid_msg.data = occupancy_grid.flatten().tolist()
   
@@ -75,15 +79,24 @@ def sensor_data_callback(data):
   odometry = data.odometry
   laser_scan = data.laser_scan
 
-  x, y, theta = odometry.pose.pose.position.x, odometry.pose.pose.position.y, odometry.pose.pose.orientation.z
+  x, y, _ = odometry.pose.pose.position.x, odometry.pose.pose.position.y, odometry.pose.pose.orientation.z
+  orientation = odometry.pose.pose.orientation
+  theta = np.arctan2(2 * (orientation.w * orientation.z), 1 - 2 * (orientation.z * orientation.z))
+  print(x, y, theta)
   i, j = location_to_grid(x, y)
+
   for angle, distance in zip(np.arange(len(laser_scan.ranges)) * laser_scan.angle_increment, laser_scan.ranges):
-    
-    if distance < laser_scan.range_max-0.01:
-      points = free_grid_cells(i, j, angle+PI*3/4, distance)
-      for point in points:
-        occupancy_grid[point] = 127
-  
+    if distance < laser_scan.range_max:
+      points = free_grid_cells(i, j, theta + angle + 135/180*PI, distance)
+      if len(points) > OCCUPAIED_AT_END:
+        for point in points[:-OCCUPAIED_AT_END]:
+          log_occupancy_grid[point] += UNOCCUPAIED_LOG_ODD
+        for point in points[-OCCUPAIED_AT_END:]:
+          log_occupancy_grid[point] += OCCUPAIED_LOG_ODD
+
+  log_occupancy_grid[log_occupancy_grid > 20] = 20
+  log_occupancy_grid[log_occupancy_grid < -20] = -20
+  occupancy_grid = 1 - 1 / (1 + np.exp(log_occupancy_grid))
   publish_occupancy_grid(occupancy_grid)
 
 

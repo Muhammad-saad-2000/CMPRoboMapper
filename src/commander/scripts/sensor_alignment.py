@@ -6,8 +6,8 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
 from cmp_msgs.msg import SensorData
 
-current_time_sequance = 0
 DELTA_TIME_MAX = 10000000
+current_time_sequance = 0
 front_data_in_sequance = False
 rear_data_in_sequance = False
 odometry_data_in_sequance = False
@@ -59,7 +59,7 @@ def all_data_received():
   front_data_in_sequance = False
   # Average the data when both lasers intersects
   incorporated_laser_data[90:270]/=2
-  incorporated_laser_data[450:720]/=2
+  incorporated_laser_data[450:630]/=2
   total_sensor_data = SensorData()
   
   total_sensor_data.laser_scan.ranges = incorporated_laser_data.tolist()
@@ -68,7 +68,7 @@ def all_data_received():
   total_sensor_data.laser_scan.angle_increment=0.008726646
   #TODO: Check if this is correct
   total_sensor_data.laser_scan.range_min = 0.1
-  total_sensor_data.laser_scan.range_max = 10.0
+  total_sensor_data.laser_scan.range_max = 30.0
   total_sensor_data.odometry = odometry_data
 
   pubObj.publish(total_sensor_data)
