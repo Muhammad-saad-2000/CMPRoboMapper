@@ -69,7 +69,6 @@ def all_data_received():
   total_sensor_data.laser_scan.angle_min = 0
   total_sensor_data.laser_scan.angle_max = 6.274446
   total_sensor_data.laser_scan.angle_increment=0.008726646
-  #TODO: Check if this is correct
   total_sensor_data.laser_scan.range_min = 0.1
   total_sensor_data.laser_scan.range_max = 30.0
   total_sensor_data.odometry = odometry_data
