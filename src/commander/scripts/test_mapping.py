@@ -8,17 +8,17 @@ from cmp_msgs.msg import SensorData
 
 
 #__________________________
-RESOLUTION = 0.1
-OCCUPAIED_AT_END = 1
-OCCUPAIED_LOG_ODD= 1.018
-UNOCCUPAIED_LOG_ODD = -1.018
-#__________________________
 PI = 3.14159265358979323846
 WIDTH=99.84/1.5
 HEIGHT=99.84/1.5
 X_OFFSET = 50/1.5
 Y_OFFSET = 50/1.5
 SENSOR_DIST=np.sqrt(2)/5+0.2
+#__________________________
+RESOLUTION = 0.1
+OCCUPAIED_AT_END = 1
+OCCUPAIED_LOG_ODD= 1.018
+UNOCCUPAIED_LOG_ODD = -1.018
 #__________________________
 MAP_SIZE_HEIGHT = int(HEIGHT / RESOLUTION)
 MAP_SIZE_WIDTH = int(WIDTH / RESOLUTION)
@@ -89,8 +89,10 @@ def sensor_data_callback(data):
   x, y= odometry.pose.pose.position.x, odometry.pose.pose.position.y # Location of the robot
   orientation = odometry.pose.pose.orientation
   theta = np.arctan2(2 * (orientation.w * orientation.z), 1 - 2 * (orientation.z * orientation.z)) # Orientation of the robot
+  # i, j = location_to_grid(y, x)
   i_0, j_0 = location_to_grid(y, x)
-
+  
+  log_occupancy_grid[:,:] = 0
   for angle, distance in zip(np.arange(len(laser_scan.ranges)) * laser_scan.angle_increment, laser_scan.ranges):
     if distance < laser_scan.range_max:
       # # Systematic error correction
@@ -101,15 +103,10 @@ def sensor_data_callback(data):
         j=j_0+int(SENSOR_DIST*np.sin(theta+PI/4)/RESOLUTION)
         i=i_0-int(SENSOR_DIST*np.cos(theta+PI/4)/RESOLUTION)
       points = free_grid_cells(i, j, -theta + angle + 135/180 * PI, distance)
-      if len(points) > OCCUPAIED_AT_END:
-        for point in points[:-OCCUPAIED_AT_END]:
-          log_occupancy_grid[point] += UNOCCUPAIED_LOG_ODD
-        for point in points[-OCCUPAIED_AT_END:]:
-          log_occupancy_grid[point] += OCCUPAIED_LOG_ODD
+      for point in points:
+        log_occupancy_grid[point] = 0.9
 
-  log_occupancy_grid[log_occupancy_grid > 20] = 20
-  log_occupancy_grid[log_occupancy_grid < -20] = -20
-  occupancy_grid = 1 - 1 / (1 + np.exp(log_occupancy_grid))
+  occupancy_grid = log_occupancy_grid
   publish_occupancy_grid(occupancy_grid)
 
 
