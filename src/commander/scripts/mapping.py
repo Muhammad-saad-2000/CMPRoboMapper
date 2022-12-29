@@ -7,21 +7,25 @@ from nav_msgs.msg import OccupancyGrid
 from cmp_msgs.msg import SensorData
 
 
-
+#__________________________
 PI = 3.14159265358979323846
-X_OFFSET = 50
-Y_OFFSET = 50
-RESOLUTION = 0.02
-MAP_SIZE_WIDTH = 4992
-MAP_SIZE_HEIGHT = 4992
-OCCUPAIED_AT_END = 10
+WIDTH=99.84/1.5
+HEIGHT=99.84/1.5
+X_OFFSET = 50/1.5
+Y_OFFSET = 50/1.5
+RESOLUTION = 0.08
+#__________________________
+OCCUPAIED_AT_END = 2
 OCCUPAIED_LOG_ODD= 1.386
 UNOCCUPAIED_LOG_ODD = -1.386
+#__________________________
+MAP_SIZE_HEIGHT = int(HEIGHT / RESOLUTION)
+MAP_SIZE_WIDTH = int(WIDTH / RESOLUTION)
 
 log_occupancy_grid = np.zeros((MAP_SIZE_WIDTH, MAP_SIZE_HEIGHT))
 
-#NOTE: x,y are the actual coordinates not the indexes of the occupancy grid
-#NOTE: i,j are indexes of the occupancy grid not the actual coordinates
+#NOTE: x, y are the actual coordinates not the indexes of the occupancy grid
+#NOTE: i, j are indexes of the occupancy grid not the actual coordinates
 
 def location_to_grid(x, y):
   return int((x + X_OFFSET)/ RESOLUTION), int((y + Y_OFFSET)/ RESOLUTION)
@@ -55,6 +59,7 @@ def free_grid_cells(i, j, angle, distance):
   return points
 
 def publish_occupancy_grid(occupancy_grid):
+  # Prepare the occupancy grid message
   occupancy_grid_msg = OccupancyGrid()
   occupancy_grid_msg.header.stamp = rospy.Time.now()
   occupancy_grid_msg.header.frame_id = "robot_map"
@@ -68,33 +73,33 @@ def publish_occupancy_grid(occupancy_grid):
   occupancy_grid_msg.info.origin.orientation.y = 0
   occupancy_grid_msg.info.origin.orientation.z = 0
   occupancy_grid_msg.info.origin.orientation.w = 1
+  # Convert the occupancy grid to a format that can be visualized in rviz
   occupancy_grid = occupancy_grid * 120
   occupancy_grid = occupancy_grid.astype(int)
   occupancy_grid_msg.data = occupancy_grid.flatten().tolist()
-  
+  # Publish the occupancy grid
   occupancy_grid_publisher.publish(occupancy_grid_msg)
 
 def sensor_data_callback(data):
-  global occupancy_grid
+  global log_occupancy_grid
   odometry = data.odometry
   laser_scan = data.laser_scan
 
-  x, y, _ = odometry.pose.pose.position.x, odometry.pose.pose.position.y, odometry.pose.pose.orientation.z
+  x, y= odometry.pose.pose.position.x, odometry.pose.pose.position.y # Location of the robot
   orientation = odometry.pose.pose.orientation
-  theta = np.arctan2(2 * (orientation.w * orientation.z), 1 - 2 * (orientation.z * orientation.z))
-  print(x, y, theta)
-  i_0, j_0 = location_to_grid(y, x)
+  theta = np.arctan2(2 * (orientation.w * orientation.z), 1 - 2 * (orientation.z * orientation.z)) # Orientation of the robot
+  i, j = location_to_grid(y, x)
 
   for angle, distance in zip(np.arange(len(laser_scan.ranges)) * laser_scan.angle_increment, laser_scan.ranges):
     if distance < laser_scan.range_max:
-      # Systematic error correction
-      if angle > PI/2 and angle < 3/2 * PI:
-        j=j_0-int(50*0.2)
-        i=i_0+int(50*0.2)
-      else:
-        j=j_0+int(50*0.2)
-        i=i_0-int(50*0.2)
-      points = free_grid_cells(i, j, -theta + angle + 135/180*PI, distance)
+      # # Systematic error correction
+      # if angle > PI/2 and angle < 3/2 * PI:
+      #   j=j_0-int(0.2/RESOLUTION)
+      #   i=i_0+int(0.2/RESOLUTION)
+      # else:
+      #   j=j_0+int(0.2/RESOLUTION)
+      #   i=i_0-int(0.2/RESOLUTION)
+      points = free_grid_cells(i, j, -theta + angle + 135/180 * PI, distance)
       if len(points) > OCCUPAIED_AT_END:
         for point in points[:-OCCUPAIED_AT_END]:
           log_occupancy_grid[point] += UNOCCUPAIED_LOG_ODD
@@ -110,10 +115,7 @@ def sensor_data_callback(data):
 
 if __name__ == '__main__':
   rospy.init_node('mapping')
-  rospy.loginfo('mapping node started')
   rate = rospy.Rate(30)
-  
   occupancy_grid_publisher = rospy.Publisher('/occupancy_grid', OccupancyGrid)
-  
   sensor_data_subscriber = rospy.Subscriber('/aligned_sensors', SensorData, sensor_data_callback)
   rospy.spin()

@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 
 <launch>
-  <include file="$(find summit_xl_sim_bringup)/launch/summit_xls_complete.launch"/>
   <node pkg="commander" type="sensor_alignment.py" name="sensor_alignment" required="true" output="screen"/>
-  <node pkg="commander" type="mapping.py" name="sensor_alignment" required="true" output="screen"/>
+  <node pkg="commander" type="mapping.py" name="mapping" required="true" output="screen"/>
 </launch>

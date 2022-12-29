@@ -17,7 +17,8 @@ cd CMPRoboMapper
 
 #____________
 catkin_make
-#try this if it does not continue (pip install pyparsing==2.4.7) and then (catkin_make)
+#try this if it does not continue and then (catkin_make)
+pip install pyparsing==2.4.7
 #____________
 
 echo "source ./devel/setup.bash" >> ~/.bashrc 
@@ -29,7 +30,7 @@ chmod +x "src/commander/scripts/mapping.py"
 ```
 ## Launch the project
 ```bash
-#if using theconstruct sim run this (source ~/CMPRoboMapper/devel/setup.bash)
+source ~/CMPRoboMapper/devel/setup.bash
 # for baic simulation
 roslaunch commander launch_project.launch
 # for mapping simulation
@@ -37,9 +38,10 @@ roslaunch commander launch_mapping.launch
 ```
 ## Launch the keyboard controller node
 ```bash
-#if using theconstruct sim run this (source ~/CMPRoboMapper/devel/setup.bash)
+source ~/CMPRoboMapper/devel/setup.bash
+# for external keyboard library (prefered as it is more responsive and has more features)
 rosrun teleop_twist_keyboard teleop_twist_keyboard.py /cmd_vel:=/robot/robotnik_base_control/cmd_vel
-# or
+# for our keyboard controll (req. 1)
 rosrun commander keyboard_controller.py
 ```
 

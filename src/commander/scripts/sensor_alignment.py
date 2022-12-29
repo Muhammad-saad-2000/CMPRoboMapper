@@ -130,11 +130,10 @@ def callback_odom(data):
 if __name__ == '__main__':
   rospy.init_node("sensor_alignment")
 
-  rate = rospy.Rate(30)
+  rate = rospy.Rate(10)
   pubObj = rospy.Publisher("/aligned_sensors", SensorData)
 
   subObj_odom = rospy.Subscriber("/robot/robotnik_base_control/odom", Odometry, callback_odom)
   subObj_front = rospy.Subscriber("/robot/front_laser/scan", LaserScan, callback_front)
   subObj_rear = rospy.Subscriber("/robot/rear_laser/scan", LaserScan, callback_rear)
   rospy.spin()
-  
