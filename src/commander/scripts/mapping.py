@@ -18,7 +18,7 @@ WIDTH=99.84/1.5
 HEIGHT=99.84/1.5
 X_OFFSET = 50/1.5
 Y_OFFSET = 50/1.5
-SENSOR_DIST=np.sqrt(2)/5+0.2
+SENSOR_DIST=np.sqrt(2)/5+0.1
 #__________________________
 MAP_SIZE_HEIGHT = int(HEIGHT / RESOLUTION)
 MAP_SIZE_WIDTH = int(WIDTH / RESOLUTION)
@@ -29,10 +29,10 @@ log_occupancy_grid = np.zeros((MAP_SIZE_WIDTH, MAP_SIZE_HEIGHT))
 #NOTE: i, j are indexes of the occupancy grid not the actual coordinates
 
 def location_to_grid(x, y):
-  return int((x + X_OFFSET)/ RESOLUTION), int((y + Y_OFFSET)/ RESOLUTION)
+  return int((y + X_OFFSET)/ RESOLUTION), int((x + Y_OFFSET)/ RESOLUTION)
 
 def grid_to_location(i, j):
-  return i * RESOLUTION - X_OFFSET, j * RESOLUTION - Y_OFFSET
+  return j * RESOLUTION - X_OFFSET, i * RESOLUTION - Y_OFFSET
 
 def free_grid_cells(i, j, angle, distance):
   points = []
@@ -89,12 +89,12 @@ def sensor_data_callback(data):
   x, y= odometry.pose.pose.position.x, odometry.pose.pose.position.y # Location of the robot
   orientation = odometry.pose.pose.orientation
   theta = np.arctan2(2 * (orientation.w * orientation.z), 1 - 2 * (orientation.z * orientation.z)) # Orientation of the robot
-  i_0, j_0 = location_to_grid(y, x)
+  i_0, j_0 = location_to_grid(x, y)
 
   for angle, distance in zip(np.arange(len(laser_scan.ranges)) * laser_scan.angle_increment, laser_scan.ranges):
     if distance < laser_scan.range_max:
-      # # Systematic error correction
-      if angle > PI/2 and angle < 3/2 * PI:
+      # Systematic error correction
+      if angle > PI/2 and angle < 3/2 * PI-0.005:
         j=j_0-int(SENSOR_DIST*np.sin(theta+PI/4)/RESOLUTION)
         i=i_0+int(SENSOR_DIST*np.cos(theta+PI/4)/RESOLUTION)
       else:
