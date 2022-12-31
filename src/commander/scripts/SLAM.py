@@ -29,6 +29,9 @@ MAP_SIZE_WIDTH = int(WIDTH / RESOLUTION)
 NUM_RAYS = 720
 ANGLE_INCREMENT = 0.0087266
 MAX_RANGE = 30
+OCCUPAIED_AT_END = 1
+OCCUPAIED_LOG_ODD= 1.018
+UNOCCUPAIED_LOG_ODD = -1.018
 # Initialize the particles
 X_prev = np.hstack((np.random.uniform(0 - 0.5, 0 + 0.5, size=(PARTICLES_NUM, 1)),
                     np.random.uniform(0 - 0.5, 0 + 0.5, size=(PARTICLES_NUM, 1)),
@@ -52,28 +55,89 @@ current_pos_estimite=(0,0,0)
 
 map = cv2.imread("src/commander/scripts/map.png", 0)
 map = cv2.resize(map, (MAP_SIZE_WIDTH, MAP_SIZE_HEIGHT))
-# Calculate the end points of the rays
-# NOTE:z===laser_scan
-def project(z, xₜ, yₜ, θₜ):
-  x, y = xₜ, yₜ
-  theta = θₜ
-  xₑ, yₑ = np.zeros(NUM_RAYS), np.zeros(NUM_RAYS)
-  i_0, j_0 = location_to_grid(x, y)
-  for index, (angle, distance) in enumerate(zip(np.arange(len(z.ranges)) * z.angle_increment, z.ranges)):
-    if distance < z.range_max:
+
+def free_grid_cells(i, j, angle, distance):
+  points = []
+  x0 = i
+  y0 = j
+  x1 = i + int(distance / RESOLUTION * np.cos(angle))
+  y1 = j + int(distance / RESOLUTION * np.sin(angle))
+  dx = abs(x1 - x0)
+  dy = abs(y1 - y0)
+  sx = 1 if x0 < x1 else -1
+  sy = 1 if y0 < y1 else -1
+  err = dx - dy
+  while True:
+    if x0 >= 0 and x0 < MAP_SIZE_WIDTH and y0 >= 0 and y0 < MAP_SIZE_HEIGHT:
+      points.append((x0, y0))
+    if x0 == x1 and y0 == y1:
+      break
+    e2 = 2 * err
+    if e2 > -dy:
+      err = err - dy
+      x0 = x0 + sx
+    if e2 < dx:
+      err = err + dx
+      y0 = y0 + sy
+  return points
+
+
+def update_map(x, z, m):
+  log_occupancy_grid = m
+  laser_scan = z
+  
+  xₚ = x[0,0]
+  yₚ = x[1,0]
+  θₚ = x[2,0]
+  i_0, j_0 = location_to_grid(xₚ, yₚ)
+  for angle, distance in zip(np.arange(len(laser_scan.ranges)) * laser_scan.angle_increment, laser_scan.ranges):
+    if distance < laser_scan.range_max:
       # Systematic error correction
       if angle > PI/2 and angle < 3/2 * PI-0.005:
-        j=j_0-int(SENSOR_DIST*np.sin(theta+PI/4)/RESOLUTION)
-        i=i_0+int(SENSOR_DIST*np.cos(theta+PI/4)/RESOLUTION)
+        j=j_0-int(SENSOR_DIST*np.sin(θₚ+PI/4)/RESOLUTION)
+        i=i_0+int(SENSOR_DIST*np.cos(θₚ+PI/4)/RESOLUTION)
       else:
-        j=j_0+int(SENSOR_DIST*np.sin(theta+PI/4)/RESOLUTION)
-        i=i_0-int(SENSOR_DIST*np.cos(theta+PI/4)/RESOLUTION)
+        j=j_0+int(SENSOR_DIST*np.sin(θₚ+PI/4)/RESOLUTION)
+        i=i_0-int(SENSOR_DIST*np.cos(θₚ+PI/4)/RESOLUTION)
+      points = free_grid_cells(i, j, -θₚ + angle + 135/180 * PI, distance)
+      if len(points) > OCCUPAIED_AT_END:
+        for point in points[:-OCCUPAIED_AT_END]:
+          log_occupancy_grid[point] += UNOCCUPAIED_LOG_ODD
+        for point in points[-OCCUPAIED_AT_END:]:
+          log_occupancy_grid[point] += OCCUPAIED_LOG_ODD
 
-      θ = -theta + angle + 135/180 * PI
-      iₑ=i + int(distance / RESOLUTION * np.cos(θ))
-      jₑ=j + int(distance / RESOLUTION * np.sin(θ))
-      xₑ[index], yₑ[index] = grid_to_location(iₑ, jₑ)
-  return xₑ, yₑ
+  log_occupancy_grid[log_occupancy_grid > 20] = 20
+  log_occupancy_grid[log_occupancy_grid < -20] = -20
+  return log_occupancy_grid
+
+
+def p_sensor_model(x, z, m):
+  occupancy_grid = np.round(1 / (1 + np.exp(-m))) # Binary map (occupancy grid)
+  occupancy_grid = occupancy_grid.astype(np.uint8) * 255
+  # Transform the map into a likelihood field
+  ll_field = cv2.distanceTransform(occupancy_grid, cv2.DIST_L2, 0)
+  σ, π = 100, 3.14
+  ll_field = np.array(ll_field)
+  ll_field = 1/np.sqrt(2*π*σ) * np.exp(-0.5*((ll_field)/σ)**2)
+  
+  # Modify the likelihood field to account for random noise
+  norm = np.max(ll_field)
+  ll_field = (0.991 * ll_field)/norm
+  # To be added in case of max range reading
+  max_range_weight = 0.009 * 1/((30-27) * norm)
+  
+  xt, yt, θt = x
+  
+  xₑ, yₑ = project(z, xt, yt, θt)
+  p = 1
+  for i, (xb, yb) in enumerate(zip(xₑ, yₑ)):
+      if xb == -np.inf or yb == -np.inf:# The ray has crossed the boundary of the map
+        p *= 10e-3
+      else:
+        ib, jb = location_to_grid(xb, yb)
+        p *= ll_field[ib, jb] + (max_range_weight if MAX_RANGE-0.5 < z.ranges[i] <= MAX_RANGE else 0)
+  return p
+
 
 def sample_motion_model(estimated_pose_prev, u_t):
     # Previous state 
@@ -107,38 +171,29 @@ def sample_motion_model(estimated_pose_prev, u_t):
     # Sampled Particle
     return (X_p, Y_p, Θ_p)
 
-## Will be used in particle filter (x is the particle, z is the measurements and m is the map)
-# NOTE:z===laser_scan
-# NOTE:m===(image array)
-def p_sensor_model(x, z, m):
-  # Transform the map into a likelihood field
-  
-  occupancy_grid = m                    # Binary map
-  ll_field = cv2.distanceTransform(occupancy_grid, cv2.DIST_L2, 0)
-  σ, π = 25, 3.14
-  ll_field = np.array(ll_field)
-  ll_field = 1/np.sqrt(2*π*σ) * np.exp(-0.5*((ll_field)/σ)**2)
-  
-  # Modify the likelihood field to account for random noise
-  norm = np.max(ll_field)
-  ll_field = (0.991 * ll_field)/norm
-  # To be added in case of max range reading
-  max_range_weight = 0.009 * 1/((30-27) * norm)
-  
-  xt, yt, θt = x
-  
-  xₑ, yₑ = project(z, xt, yt, θt)
-  p = 1
-  for i, (xb, yb) in enumerate(zip(xₑ, yₑ)):
-      if xb == -np.inf or yb == -np.inf:# The ray has crossed the boundary of the map
-        p *= 10e-3
+def project(z, xₜ, yₜ, θₜ):
+  xₑ, yₑ = np.zeros(NUM_RAYS), np.zeros(NUM_RAYS)
+  i_0, j_0 = location_to_grid(xₜ, yₜ)
+  for index, (angle, distance) in enumerate(zip(np.arange(len(z.ranges)) * z.angle_increment, z.ranges)):
+    if distance < z.range_max:
+      # Systematic error correction
+      if angle > PI/2 and angle < 3/2 * PI-0.005:
+        j=j_0-int(SENSOR_DIST*np.sin(θₜ+PI/4)/RESOLUTION)
+        i=i_0+int(SENSOR_DIST*np.cos(θₜ+PI/4)/RESOLUTION)
       else:
-        ib, jb = location_to_grid(xb, yb)
-        p *= ll_field[ib, jb] + (max_range_weight if MAX_RANGE-0.5 < z.ranges[i] <= MAX_RANGE else 0)
-  return p
+        j=j_0+int(SENSOR_DIST*np.sin(θₜ+PI/4)/RESOLUTION)
+        i=i_0-int(SENSOR_DIST*np.cos(θₜ+PI/4)/RESOLUTION)
 
-# NOTE:z===laser_scan
-# NOTE:m===(image array)
+      θ = -θₜ + angle + 135/180 * PI
+      iₑ=i + int(distance / RESOLUTION * np.cos(θ))
+      jₑ=j + int(distance / RESOLUTION * np.sin(θ))
+      xₑ[index], yₑ[index] = grid_to_location(iₑ, jₑ)
+
+    xₑ[xₑ < -20 ], xₑ[xₑ >= 28 ]  = -np.inf, -np.inf
+    yₑ[yₑ < -16 ], yₑ[yₑ >= 34 ] = -np.inf, -np.inf
+    return xₑ, yₑ
+
+
 def MCL(u, z, m):
     global X_prev
     X = np.zeros((PARTICLES_NUM,3))# 3 for pose(x,y,theta) {particle array}

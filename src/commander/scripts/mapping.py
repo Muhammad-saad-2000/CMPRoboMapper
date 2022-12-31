@@ -118,5 +118,5 @@ if __name__ == '__main__':
   rospy.init_node('mapping')
   rate = rospy.Rate(30)
   occupancy_grid_publisher = rospy.Publisher('/occupancy_grid', OccupancyGrid)
-  sensor_data_subscriber = rospy.Subscriber('/aligned_sensors', SensorData, sensor_data_callback)
+  sensor_data_subscriber = rospy.Subscriber('/aligned_sensors', SensorData, sensor_data_callback, queue_size=2)
   rospy.spin()
