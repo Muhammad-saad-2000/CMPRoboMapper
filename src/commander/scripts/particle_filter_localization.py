@@ -12,21 +12,21 @@ import os
 import matplotlib.pyplot as plt
 PI = 3.14159265358979323846
 SENSOR_DIST=np.sqrt(2)/5+0.1
-PARTICLES_NUM = 2 # Number of particles
+PARTICLES_NUM = 50 # Number of particles
 # Initial Pose
 X_OFFSET = 50
 Y_OFFSET = 50
 
 # Map Parameters
-RESOLUTION = 0.1
+RESOLUTION = 0.02
 WIDTH = 99.84
 HEIGHT = 99.84
 MAP_SIZE_HEIGHT = int(HEIGHT / RESOLUTION)
 MAP_SIZE_WIDTH = int(WIDTH / RESOLUTION)
 # Initialize the particles
-X_prev = np.hstack((np.random.uniform(X_OFFSET - 2.5, X_OFFSET + 2.5, size=(PARTICLES_NUM, 1)),
-                    np.random.uniform(Y_OFFSET - 2.5, Y_OFFSET + 2.5, size=(PARTICLES_NUM, 1)),
-                     np.random.uniform(0 , 360, size=(PARTICLES_NUM, 1))
+X_prev = np.hstack((np.random.uniform(0 - 1.5, 0 + 1.5, size=(PARTICLES_NUM, 1)),
+                    np.random.uniform(0 - 1.5, 0 + 1.5, size=(PARTICLES_NUM, 1)),
+                     np.random.uniform(0 , 2*PI, size=(PARTICLES_NUM, 1))
                     ))
 
 
@@ -49,7 +49,7 @@ def project(z, xₜ, yₜ, θₜ):
   theta = θₜ
   xₑ, yₑ = np.zeros(NUM_RAYS), np.zeros(NUM_RAYS)
   i_0, j_0 = location_to_grid(x, y)
-  for i, (angle, distance) in enumerate(zip(np.arange(len(z.ranges)) * z.angle_increment, z.ranges)):
+  for index, (angle, distance) in enumerate(zip(np.arange(len(z.ranges)) * z.angle_increment, z.ranges)):
     if distance < z.range_max:
       # Systematic error correction
       if angle > PI/2 and angle < 3/2 * PI-0.005:
@@ -59,9 +59,10 @@ def project(z, xₜ, yₜ, θₜ):
         j=j_0+int(SENSOR_DIST*np.sin(theta+PI/4)/RESOLUTION)
         i=i_0-int(SENSOR_DIST*np.cos(theta+PI/4)/RESOLUTION)
 
-      iₑ=i + int(distance / RESOLUTION * np.cos(angle))
-      jₑ=j + int(distance / RESOLUTION * np.sin(angle))
-      xₑ[i], yₑ[i] = grid_to_location(iₑ, jₑ)
+      θ = -theta + angle + 135/180 * PI
+      iₑ=i + int(distance / RESOLUTION * np.cos(θ))
+      jₑ=j + int(distance / RESOLUTION * np.sin(θ))
+      xₑ[index], yₑ[index] = grid_to_location(iₑ, jₑ)
   return xₑ, yₑ
 
 def sample_motion_model(estimated_pose_prev, u_t):
@@ -104,13 +105,14 @@ def p_sensor_model(x, z, m):
   
   occupancy_grid = m                    # Binary map
   ll_field = cv2.distanceTransform(occupancy_grid, cv2.DIST_L2, 0)
-  σ, π = 20, 3.14
+  σ, π = 30, 3.14
   ll_field = np.array(ll_field)
   ll_field = 1/np.sqrt(2*π*σ) * np.exp(-0.5*((ll_field)/σ)**2)
   
   # Modify the likelihood field to account for random noise
   norm = np.max(ll_field)
-  ll_field = (0.991 * ll_field)/norm
+  ll_field = (0.980 * ll_field)/norm
+  ll_field += 0.011 * 1/norm
   # To be added in case of max range reading
   max_range_weight = 0.009 * 1/((30-27) * norm)
   MAX_RANGE = 30
@@ -123,8 +125,9 @@ def p_sensor_model(x, z, m):
       if xb == -np.inf or yb == -np.inf:# The ray has crossed the boundary of the map
         p *= 10e-3
       else:
-        p *= ll_field[xb, yb] + (max_range_weight if MAX_RANGE-0.5 < z[i] <= MAX_RANGE else 0)
-
+        ib, jb = location_to_grid(xb, yb)
+        #print(ll_field[ib, jb])
+        p *= ll_field[ib, jb] + (max_range_weight if MAX_RANGE-0.5 < z.ranges[i] <= MAX_RANGE else 0)
   return p
 
 # NOTE:z===laser_scan
@@ -132,13 +135,16 @@ def p_sensor_model(x, z, m):
 def MCL(u, z, m):
     global X_prev
     X = np.zeros((PARTICLES_NUM,3))# 3 for pose(x,y,theta) {particle array}
-    W = np.zeros((PARTICLES_NUM,1))
+    W = np.zeros(PARTICLES_NUM)
     # For each particle
     for i in range(PARTICLES_NUM):
       X[i] = sample_motion_model(X_prev[i], u)
       W[i] = p_sensor_model(X[i], z, m)
     # Resample X according to W
-    X_prev = np.random.choice(X, p=W, k=PARTICLES_NUM)
+    #print(W)
+    r= np.arange(len(X_prev))
+    r = np.random.choice(r, size=PARTICLES_NUM, p=W/np.sum(W))
+    X_prev = X[r]
     # return the particle with the highest weight
     return X[np.argmax(W)]
 
@@ -159,6 +165,7 @@ def sensor_data_callback(data):
   current_pos_estimite = MCL(u_t, z_t, map)
   
   # Publish the estimated pose and particles
+  #print(current_pos_estimite)
   pose = Pose()
   pose.position.x=current_pos_estimite[0]
   pose.position.y=current_pos_estimite[1]
@@ -170,6 +177,9 @@ def sensor_data_callback(data):
   pose_publisher.publish(pose)
   
   particles = PoseArray()
+  particles.poses=[]
+  particles.header.frame_id = "robot_map"
+  poses = []
   for i in range(PARTICLES_NUM):
     particle = Pose()
     particle.position.x = X_prev[i][0]
@@ -179,7 +189,9 @@ def sensor_data_callback(data):
     particle.orientation.y = 0
     particle.orientation.w = 1
     particle.orientation.z = np.sin(X_prev[i][2]/2)
-    particles.poses.append(particle)
+    poses.append(particle)
+    
+  particles.poses = poses
   particle_publisher.publish(particles)
 
 
