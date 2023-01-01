@@ -10,8 +10,8 @@ from cmp_msgs.msg import SensorData
 #__________________________
 RESOLUTION = 0.1
 OCCUPAIED_AT_END = 1
-OCCUPAIED_LOG_ODD= 1.018
-UNOCCUPAIED_LOG_ODD = -1.018
+OCCUPAIED_LOG_ODD= 1.118
+UNOCCUPAIED_LOG_ODD = -1.118
 #__________________________
 PI = 3.14159265358979323846
 WIDTH=99.84/1.5
@@ -94,7 +94,7 @@ def sensor_data_callback(data):
   for angle, distance in zip(np.arange(len(laser_scan.ranges)) * laser_scan.angle_increment, laser_scan.ranges):
     if distance < laser_scan.range_max:
       # Systematic error correction
-      if angle > PI/2 and angle < 3/2 * PI-0.005:
+      if angle > PI/2-0.004 and angle < 3/2 * PI-0.005:
         j=j_0-int(SENSOR_DIST*np.sin(theta+PI/4)/RESOLUTION)
         i=i_0+int(SENSOR_DIST*np.cos(theta+PI/4)/RESOLUTION)
       else:

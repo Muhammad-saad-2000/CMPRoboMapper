@@ -130,7 +130,7 @@ def update_map(x, z, m):
   for angle, distance in zip(np.arange(len(laser_scan.ranges)) * laser_scan.angle_increment, laser_scan.ranges):
     if distance < laser_scan.range_max:
       # Systematic error correction
-      if angle > pi/2 and angle < 3/2 * pi-0.005:
+      if angle > pi/2-0.004 and angle < 3/2 * pi-0.005:
         j=j_0-int(SENSOR_DIST*np.sin(θₚ+pi/4)/RESOLUTION)
         i=i_0+int(SENSOR_DIST*np.cos(θₚ+pi/4)/RESOLUTION)
       else:
@@ -157,7 +157,7 @@ def project(z, xₜ, yₜ, θₜ):
   for index, (angle, distance) in enumerate(zip(np.arange(len(z.ranges)) * z.angle_increment, z.ranges)):
     if distance < z.range_max:
       # Systematic error correction
-      if angle > pi/2 and angle < 3/2 * pi-0.005:
+      if angle > pi/2 -0.004 and angle < 3/2 * pi-0.005:
         j=j_0-int(SENSOR_DIST*np.sin(θₜ+pi/4)/RESOLUTION)
         i=i_0+int(SENSOR_DIST*np.cos(θₜ+pi/4)/RESOLUTION)
       else:

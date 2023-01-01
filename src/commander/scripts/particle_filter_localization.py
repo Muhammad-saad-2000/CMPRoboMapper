@@ -12,7 +12,7 @@ import os
 import matplotlib.pyplot as plt
 PI = 3.14159265358979323846
 SENSOR_DIST=np.sqrt(2)/5+0.1
-PARTICLES_NUM = 10 # Number of particles
+PARTICLES_NUM = 5 # Number of particles
 # Map Parameters
 #__________________________
 RESOLUTION = 0.1
@@ -92,7 +92,7 @@ def sample_motion_model(estimated_pose_prev, u_t):
     Δδrot1_u=Δδrot1_u+np.random.normal(0, 0.001)
     Δδrot2_u=Δδrot2_u+np.random.normal(0, 0.001)
     # Noise Parameters
-    α1, α2, α3, α4 = 0.02, 0.02, 0.02, 0.02
+    α1, α2, α3, α4 = 0.01, 0.01, 0.01, 0.01
 
     # Samples of the actual differences
     Δδtr = Δδtr_u + np.random.normal(0,  α1* np.abs(Δδrot1_u) + α2* np.abs(Δδtr_u) )
@@ -115,7 +115,7 @@ def p_sensor_model(x, z, m):
   
   occupancy_grid = m                    # Binary map
   ll_field = cv2.distanceTransform(occupancy_grid, cv2.DIST_L2, 0)
-  σ, π = 25, 3.14
+  σ, π = 20, 3.14
   ll_field = np.array(ll_field)
   ll_field = 1/np.sqrt(2*π*σ) * np.exp(-0.5*((ll_field)/σ)**2)
   
@@ -128,13 +128,13 @@ def p_sensor_model(x, z, m):
   xt, yt, θt = x
   
   xₑ, yₑ = project(z, xt, yt, θt)
-  p = 1
+  p = np.log(1)/100
   for i, (xb, yb) in enumerate(zip(xₑ, yₑ)):
       if xb == -np.inf or yb == -np.inf:# The ray has crossed the boundary of the map
-        p *= 10e-3
+        p += np.log(10e-3)/100
       else:
         ib, jb = location_to_grid(xb, yb)
-        p *= ll_field[ib, jb] + (max_range_weight if MAX_RANGE-0.5 < z.ranges[i] <= MAX_RANGE else 0)
+        p += np.log(ll_field[ib, jb] + (max_range_weight if MAX_RANGE-0.5 < z.ranges[i] <= MAX_RANGE else 0))/100
   return p
 
 # NOTE:z===laser_scan
@@ -148,7 +148,7 @@ def MCL(u, z, m):
       X[i] = sample_motion_model(X_prev[i], u)
       W[i] = p_sensor_model(X[i], z, m)
     # Resample X according to W
-    print(W)
+    #print(W)
     r= np.arange(len(X_prev))
     r = np.random.choice(r, size=PARTICLES_NUM, p=W/np.sum(W))
     X_prev = X[r]
@@ -212,5 +212,5 @@ if __name__ == '__main__':
   rate = rospy.Rate(30)
   pose_publisher = rospy.Publisher('/estimate_pose', PoseArray)
   particle_publisher = rospy.Publisher('/particles', PoseArray)
-  sensor_data_subscriber = rospy.Subscriber('/aligned_sensors', SensorData, sensor_data_callback, queue_size=2)
+  sensor_data_subscriber = rospy.Subscriber('/aligned_sensors', SensorData, sensor_data_callback, queue_size=1)
   rospy.spin()
